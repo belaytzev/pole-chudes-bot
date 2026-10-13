@@ -1,3 +1,4 @@
 *.db
 *.db-*
 /pole-chudes-bot
+/deploy/
