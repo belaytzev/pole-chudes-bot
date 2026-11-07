@@ -42,8 +42,37 @@ func OpenStore(path string) (*Store, error) {
 	return &Store{db}, nil
 }
 
+func (s *Store) Close() error { return s.db.Close() }
+
+// Migrate moves a chat's data to its new id after a group is upgraded to a supergroup.
+func (s *Store) Migrate(from, to int64) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	for _, q := range []string{
+		`UPDATE OR IGNORE players SET chat_id = ? WHERE chat_id = ?`,
+		`UPDATE OR IGNORE draws SET chat_id = ? WHERE chat_id = ?`,
+	} {
+		if _, err := tx.Exec(q, to, from); err != nil {
+			return err
+		}
+	}
+	for _, q := range []string{`DELETE FROM players WHERE chat_id = ?`, `DELETE FROM draws WHERE chat_id = ?`} {
+		if _, err := tx.Exec(q, from); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
 func (s *Store) Join(chat, user int64, name string) (bool, error) {
-	res, err := s.db.Exec(`INSERT INTO players (chat_id, user_id, name) VALUES (?, ?, ?)
+	res, err := s.db.Exec(`UPDATE players SET name = ? WHERE chat_id = ? AND user_id = ? AND active = 1`, name, chat, user)
+	if already, err := affected(res, err); already || err != nil {
+		return false, err
+	}
+	res, err = s.db.Exec(`INSERT INTO players (chat_id, user_id, name) VALUES (?, ?, ?)
 		ON CONFLICT (chat_id, user_id) DO UPDATE SET name = excluded.name, active = 1 WHERE active = 0`,
 		chat, user, name)
 	return affected(res, err)
