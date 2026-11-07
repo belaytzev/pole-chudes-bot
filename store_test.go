@@ -2,6 +2,8 @@ package main
 
 import (
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -51,6 +53,88 @@ func TestStore(t *testing.T) {
 	}
 	if total != 51 {
 		t.Fatalf("all-time total = %d, want 51", total)
+	}
+}
+
+func TestDrawConcurrent(t *testing.T) {
+	s, _ := OpenStore(":memory:")
+	const chat = -200
+	s.Join(chat, 1, "Вася")
+	s.Join(chat, 2, "Петя")
+	var wg sync.WaitGroup
+	var fresh, winner atomic.Int64
+	for range 20 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			u, _, f, ok, err := s.Draw(chat, "2026-10-13")
+			if err != nil || !ok {
+				t.Errorf("draw: ok=%v err=%v", ok, err)
+				return
+			}
+			if f {
+				fresh.Add(1)
+			}
+			winner.CompareAndSwap(0, u)
+			if winner.Load() != u {
+				t.Errorf("different winners in one day")
+			}
+		}()
+	}
+	wg.Wait()
+	if fresh.Load() != 1 {
+		t.Fatalf("fresh draws = %d, want 1", fresh.Load())
+	}
+}
+
+func TestJoinRefreshesName(t *testing.T) {
+	s, _ := OpenStore(":memory:")
+	const chat = -300
+	if fresh, _ := s.Join(chat, 1, "Вася"); !fresh {
+		t.Fatal("first join must be fresh")
+	}
+	if fresh, _ := s.Join(chat, 1, "Василий"); fresh {
+		t.Fatal("repeat join must not be fresh")
+	}
+	s.Join(chat, 2, "Петя")
+	s.Draw(chat, "2026-10-13")
+	s.Draw(chat, "2026-10-14")
+	s.Draw(chat, "2026-10-15")
+	for _, sc := range mustTop(t, s, chat) {
+		if sc.Name == "Вася" {
+			t.Fatal("stale name after rejoin")
+		}
+	}
+	s.Leave(chat, 1)
+	if fresh, _ := s.Join(chat, 1, "Вася"); !fresh {
+		t.Fatal("join after leave must be fresh")
+	}
+}
+
+func mustTop(t *testing.T, s *Store, chat int64) []Score {
+	top, err := s.Top(chat, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return top
+}
+
+func TestMigrate(t *testing.T) {
+	s, _ := OpenStore(":memory:")
+	s.Join(-1, 1, "Вася")
+	s.Join(-1, 2, "Петя")
+	s.Draw(-1, "2026-10-13")
+	if err := s.Migrate(-1, -1001); err != nil {
+		t.Fatal(err)
+	}
+	if n, _ := s.Players(-1); n != 0 {
+		t.Fatalf("old chat keeps %d players", n)
+	}
+	if n, _ := s.Players(-1001); n != 2 {
+		t.Fatalf("new chat has %d players, want 2", n)
+	}
+	if _, _, fresh, ok, _ := s.Draw(-1001, "2026-10-13"); !ok || fresh {
+		t.Fatalf("migrated draw must be kept: ok=%v fresh=%v", ok, fresh)
 	}
 }
 
