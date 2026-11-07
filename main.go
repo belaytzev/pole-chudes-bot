@@ -5,8 +5,11 @@ import (
 	"log"
 	"math/rand/v2"
 	"os"
+	"os/signal"
 	"strconv"
 	"strings"
+	"sync"
+	"syscall"
 	"time"
 	_ "time/tzdata"
 
@@ -28,8 +31,12 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	token := os.Getenv("BOT_TOKEN")
+	if token == "" {
+		log.Fatal("BOT_TOKEN is not set")
+	}
 	bot, err := tele.NewBot(tele.Settings{
-		Token:     os.Getenv("BOT_TOKEN"),
+		Token:     token,
 		Poller:    &tele.LongPoller{Timeout: 30 * time.Second},
 		ParseMode: tele.ModeHTML,
 		OnError:   func(err error, c tele.Context) { log.Printf("update error: %v", err) },
@@ -39,6 +46,14 @@ func main() {
 	}
 	a := &app{bot, store, loc}
 
+	var inflight sync.WaitGroup
+	bot.Use(func(next tele.HandlerFunc) tele.HandlerFunc {
+		return func(c tele.Context) error {
+			inflight.Add(1)
+			defer inflight.Done()
+			return next(c)
+		}
+	})
 	bot.Handle("/start", a.help)
 	bot.Handle("/help", a.help)
 	g := bot.Group()
@@ -50,6 +65,7 @@ func main() {
 	g.Handle("/zalslavy", a.allTop)
 	g.Handle("/moi", a.mine)
 	g.Handle(tele.OnUserLeft, a.userLeft)
+	g.Handle(tele.OnMigration, a.migrate)
 
 	err = bot.SetCommands([]tele.Command{
 		{Text: "igrok", Description: "Записаться в игроки"},
@@ -63,13 +79,28 @@ func main() {
 		log.Printf("set commands: %v", err)
 	}
 	log.Printf("started as @%s", bot.Me.Username)
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
+	go func() { <-stop; bot.Stop() }()
 	bot.Start()
+	inflight.Wait()
+	if err := store.Close(); err != nil {
+		log.Printf("close store: %v", err)
+	}
+}
+
+func (a *app) migrate(c tele.Context) error {
+	from, to := c.Migration()
+	return a.store.Migrate(from, to)
 }
 
 func groupOnly(next tele.HandlerFunc) tele.HandlerFunc {
 	return func(c tele.Context) error {
 		if c.Chat().Type == tele.ChatPrivate {
 			return c.Send(PrivateOnly)
+		}
+		if u := c.Sender(); u != nil && u.IsBot { // anonymous group admins arrive as GroupAnonymousBot
+			return nil
 		}
 		return next(c)
 	}
