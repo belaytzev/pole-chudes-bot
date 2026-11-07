@@ -96,27 +96,15 @@ func TestJoinRefreshesName(t *testing.T) {
 	if fresh, _ := s.Join(chat, 1, "Василий"); fresh {
 		t.Fatal("repeat join must not be fresh")
 	}
-	s.Join(chat, 2, "Петя")
-	s.Draw(chat, "2026-10-13")
-	s.Draw(chat, "2026-10-14")
-	s.Draw(chat, "2026-10-15")
-	for _, sc := range mustTop(t, s, chat) {
-		if sc.Name == "Вася" {
-			t.Fatal("stale name after rejoin")
-		}
+	var name string
+	s.db.QueryRow(`SELECT name FROM players WHERE chat_id = ? AND user_id = 1`, chat).Scan(&name)
+	if name != "Василий" {
+		t.Fatalf("name = %q, want Василий", name)
 	}
 	s.Leave(chat, 1)
 	if fresh, _ := s.Join(chat, 1, "Вася"); !fresh {
 		t.Fatal("join after leave must be fresh")
 	}
-}
-
-func mustTop(t *testing.T, s *Store, chat int64) []Score {
-	top, err := s.Top(chat, "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	return top
 }
 
 func TestMigrate(t *testing.T) {

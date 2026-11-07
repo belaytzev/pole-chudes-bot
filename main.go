@@ -8,6 +8,7 @@ import (
 	"os/signal"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 	_ "time/tzdata"
@@ -45,6 +46,14 @@ func main() {
 	}
 	a := &app{bot, store, loc}
 
+	var inflight sync.WaitGroup
+	bot.Use(func(next tele.HandlerFunc) tele.HandlerFunc {
+		return func(c tele.Context) error {
+			inflight.Add(1)
+			defer inflight.Done()
+			return next(c)
+		}
+	})
 	bot.Handle("/start", a.help)
 	bot.Handle("/help", a.help)
 	g := bot.Group()
@@ -74,6 +83,7 @@ func main() {
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 	go func() { <-stop; bot.Stop() }()
 	bot.Start()
+	inflight.Wait()
 	if err := store.Close(); err != nil {
 		log.Printf("close store: %v", err)
 	}
@@ -89,6 +99,9 @@ func groupOnly(next tele.HandlerFunc) tele.HandlerFunc {
 		if c.Chat().Type == tele.ChatPrivate {
 			return c.Send(PrivateOnly)
 		}
+		if u := c.Sender(); u != nil && u.IsBot { // anonymous group admins arrive as GroupAnonymousBot
+			return nil
+		}
 		return next(c)
 	}
 }
@@ -97,9 +110,6 @@ func (a *app) help(c tele.Context) error { return c.Send(Help) }
 
 func (a *app) join(c tele.Context) error {
 	u := c.Sender()
-	if u.IsBot { // anonymous group admins arrive as the GroupAnonymousBot
-		return nil
-	}
 	fresh, err := a.store.Join(c.Chat().ID, u.ID, displayName(u))
 	if err != nil {
 		return err
