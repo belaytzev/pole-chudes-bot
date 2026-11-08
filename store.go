@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 
 	_ "modernc.org/sqlite"
@@ -91,11 +92,27 @@ func (s *Store) Players(chat int64) (n int, err error) {
 // Draw picks today's winner once per chat; concurrent calls get the same row via the PK.
 // ok=false means nobody was drawn today and there are fewer than two players.
 func (s *Store) Draw(chat int64, day string) (user int64, name string, fresh, ok bool, err error) {
+	return s.draw(chat, day, "[]")
+}
+
+// DrawExcept skips the excluded users; if that leaves nobody, everyone takes part again.
+func (s *Store) DrawExcept(chat int64, day string, excl []int64) (user int64, name string, fresh, ok bool, err error) {
+	if len(excl) > 0 {
+		b, _ := json.Marshal(excl)
+		if user, name, fresh, ok, err = s.draw(chat, day, string(b)); err != nil || ok {
+			return
+		}
+	}
+	return s.draw(chat, day, "[]")
+}
+
+func (s *Store) draw(chat int64, day, excl string) (user int64, name string, fresh, ok bool, err error) {
 	res, err := s.db.Exec(`INSERT OR IGNORE INTO draws (chat_id, day, user_id)
 		SELECT ?, ?, user_id FROM players
 		WHERE chat_id = ? AND active = 1
+		  AND user_id NOT IN (SELECT value FROM json_each(?))
 		  AND (SELECT COUNT(*) FROM players WHERE chat_id = ? AND active = 1) >= 2
-		ORDER BY RANDOM() LIMIT 1`, chat, day, chat, chat)
+		ORDER BY RANDOM() LIMIT 1`, chat, day, chat, excl, chat)
 	if fresh, err = affected(res, err); err != nil {
 		return
 	}

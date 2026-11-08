@@ -72,6 +72,34 @@ func TestBirthdayStore(t *testing.T) {
 	}
 }
 
+func TestDrawExcept(t *testing.T) {
+	s, _ := OpenStore(":memory:")
+	for u := int64(1); u <= 3; u++ {
+		s.Join(-1, u, "игрок")
+	}
+	for d := 1; d <= 40; d++ {
+		day := time.Date(2026, 1, d, 0, 0, 0, 0, time.UTC).Format("2006-01-02")
+		if u, _, _, ok, _ := s.DrawExcept(-1, day, []int64{1}); !ok || u == 1 {
+			t.Fatalf("excluded user won or no draw: u=%d ok=%v", u, ok)
+		}
+	}
+
+	s2, _ := OpenStore(":memory:")
+	s2.Join(-2, 1, "Вася")
+	s2.Join(-2, 2, "Петя")
+	if u, _, _, ok, _ := s2.DrawExcept(-2, "2026-01-01", []int64{1}); !ok || u != 2 {
+		t.Fatalf("with two players the other one must win: u=%d ok=%v", u, ok)
+	}
+	if u, _, fresh, ok, _ := s2.DrawExcept(-2, "2026-01-02", []int64{1, 2}); !ok || !fresh || u == 0 {
+		t.Fatalf("everyone excluded must fall back to everyone: u=%d ok=%v", u, ok)
+	}
+	s3, _ := OpenStore(":memory:")
+	s3.Join(-3, 1, "Вася")
+	if _, _, _, ok, _ := s3.DrawExcept(-3, "2026-01-01", []int64{1}); ok {
+		t.Fatal("a single player never makes a draw")
+	}
+}
+
 func TestGreetOncePerYear(t *testing.T) {
 	s, _ := OpenStore(":memory:")
 	if ok, _ := s.Greet(-1, 1, "birthday", 2026); !ok {

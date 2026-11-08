@@ -137,7 +137,7 @@ func TestPhrasesRender(t *testing.T) {
 	pools := [][]string{Openings, Spins, Sectors, Gifts, Letters, Reveals, Winners, Already, Joined,
 		{AlreadyJoined, LeftGame, NotJoined, LeftChat, NotEnough, PrivateOnly, EmptyTop, MyScore, Help},
 		BirthdayGreets,
-		{Anniversary, BirthdayBad, BirthdaySaved, BirthdayFromProfile, BirthdayKnown, BirthdayNotFound,
+		{BirthdayRest, Anniversary, BirthdayBad, BirthdaySaved, BirthdayFromProfile, BirthdayKnown, BirthdayNotFound,
 			QuoteSaved, QuoteDup, QuoteNoText, QuoteTooLong, QuoteEmpty}}
 	for _, j := range Jubilees {
 		pools = append(pools, []string{j})

@@ -6,6 +6,7 @@ import (
 	"math/rand/v2"
 	"os"
 	"os/signal"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -154,7 +155,9 @@ func (a *app) spin(c tele.Context) error {
 	if err != nil {
 		return err
 	}
-	user, name, fresh, ok, err := a.store.Draw(chat.ID, today(time.Now(), a.loc))
+	now := time.Now().In(a.loc)
+	excl := a.birthdayExcl(chat.ID, now)
+	user, name, fresh, ok, err := a.store.DrawExcept(chat.ID, today(now, a.loc), excl)
 	if err != nil {
 		return err
 	}
@@ -174,6 +177,9 @@ func (a *app) spin(c tele.Context) error {
 	final := "П🟦🟦🟦Р дня\n\n" + pick(Reveals) + "\n\n" + render(pick(Winners), "{name}", mention)
 	if j, ok := Jubilees[wins]; ok {
 		final += "\n\n" + render(j, "{name}", name)
+	}
+	if len(excl) > 0 && !slices.Contains(excl, user) {
+		final += "\n\n" + BirthdayRest
 	}
 	frames := []string{
 		render(pick(Openings), "{n}", strconv.Itoa(players)),

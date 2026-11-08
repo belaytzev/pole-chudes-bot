@@ -66,6 +66,21 @@ func (a *app) profileBirthday(user int64) (month, day int, ok bool) {
 	return b.Month, b.Day, b.Month != 0 && b.Day != 0
 }
 
+func (a *app) birthdayExcl(chat int64, now time.Time) []int64 {
+	list, err := a.store.Birthdays()
+	if err != nil {
+		log.Printf("birthdays: %v", err)
+		return nil
+	}
+	var ids []int64
+	for _, b := range list {
+		if b.Chat == chat && birthdayToday(b.Month, b.Day, now) {
+			ids = append(ids, b.User)
+		}
+	}
+	return ids
+}
+
 func (a *app) syncBirthday(user int64) {
 	if m, d, ok := a.profileBirthday(user); ok {
 		if err := a.store.SetBirthday(user, m, d, false); err != nil {
