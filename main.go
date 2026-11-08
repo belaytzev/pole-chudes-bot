@@ -17,9 +17,10 @@ import (
 )
 
 type app struct {
-	bot   *tele.Bot
-	store *Store
-	loc   *time.Location
+	bot     *tele.Bot
+	store   *Store
+	loc     *time.Location
+	sticker string // optional file_id of the spinning-drum sticker
 }
 
 func main() {
@@ -44,7 +45,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	a := &app{bot, store, loc}
+	a := &app{bot, store, loc, os.Getenv("SPIN_STICKER")}
 
 	var inflight sync.WaitGroup
 	bot.Use(func(next tele.HandlerFunc) tele.HandlerFunc {
@@ -176,6 +177,18 @@ func (a *app) spin(c tele.Context) error {
 		pick(Letters),
 	}
 
+	if a.sticker != "" {
+		sm, err := a.bot.Send(chat, &tele.Sticker{File: tele.File{FileID: a.sticker}})
+		if err != nil {
+			log.Printf("send sticker: %v", err)
+		} else {
+			defer func() {
+				if err := a.bot.Delete(sm); err != nil {
+					log.Printf("delete sticker: %v", err)
+				}
+			}()
+		}
+	}
 	msg, err := a.bot.Send(chat, frames[0])
 	if err != nil {
 		return err
