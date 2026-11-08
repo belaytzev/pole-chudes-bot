@@ -21,6 +21,12 @@ CREATE TABLE IF NOT EXISTS draws (
 	day     TEXT    NOT NULL,
 	user_id INTEGER NOT NULL,
 	PRIMARY KEY (chat_id, day)
+);
+CREATE TABLE IF NOT EXISTS beauties (
+	chat_id INTEGER NOT NULL,
+	day     TEXT    NOT NULL,
+	user_id INTEGER NOT NULL,
+	PRIMARY KEY (chat_id, day)
 );`
 
 type Store struct{ db *sql.DB }
@@ -55,12 +61,13 @@ func (s *Store) Migrate(from, to int64) error {
 	for _, q := range []string{
 		`UPDATE OR IGNORE players SET chat_id = ? WHERE chat_id = ?`,
 		`UPDATE OR IGNORE draws SET chat_id = ? WHERE chat_id = ?`,
+		`UPDATE OR IGNORE beauties SET chat_id = ? WHERE chat_id = ?`,
 	} {
 		if _, err := tx.Exec(q, to, from); err != nil {
 			return err
 		}
 	}
-	for _, q := range []string{`DELETE FROM players WHERE chat_id = ?`, `DELETE FROM draws WHERE chat_id = ?`} {
+	for _, q := range []string{`DELETE FROM players WHERE chat_id = ?`, `DELETE FROM draws WHERE chat_id = ?`, `DELETE FROM beauties WHERE chat_id = ?`} {
 		if _, err := tx.Exec(q, from); err != nil {
 			return err
 		}
@@ -125,14 +132,45 @@ func (s *Store) draw(chat int64, day, excl string) (user int64, name string, fre
 	return user, name, fresh, err == nil, err
 }
 
-func (s *Store) Wins(chat, user int64, since string) (n int, err error) {
-	err = s.db.QueryRow(`SELECT COUNT(*) FROM draws WHERE chat_id = ? AND user_id = ? AND day >= ?`,
+// Beauty picks today's beauty once per chat, never the same person as the winner.
+func (s *Store) Beauty(chat int64, day string, winner int64) (user int64, name string, ok bool, err error) {
+	if _, err = s.db.Exec(`INSERT OR IGNORE INTO beauties (chat_id, day, user_id)
+		SELECT ?, ?, user_id FROM players
+		WHERE chat_id = ? AND active = 1 AND user_id != ?
+		ORDER BY RANDOM() LIMIT 1`, chat, day, chat, winner); err != nil {
+		return
+	}
+	err = s.db.QueryRow(`SELECT b.user_id, p.name FROM beauties b
+		JOIN players p ON p.chat_id = b.chat_id AND p.user_id = b.user_id
+		WHERE b.chat_id = ? AND b.day = ?`, chat, day).Scan(&user, &name)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, "", false, nil
+	}
+	return user, name, err == nil, err
+}
+
+func (s *Store) Wins(chat, user int64, since string) (int, error) {
+	return s.wins("draws", chat, user, since)
+}
+
+func (s *Store) BeautyWins(chat, user int64, since string) (int, error) {
+	return s.wins("beauties", chat, user, since)
+}
+
+func (s *Store) wins(table string, chat, user int64, since string) (n int, err error) {
+	err = s.db.QueryRow(`SELECT COUNT(*) FROM `+table+` WHERE chat_id = ? AND user_id = ? AND day >= ?`,
 		chat, user, since).Scan(&n)
 	return
 }
 
-func (s *Store) Top(chat int64, since string) ([]Score, error) {
-	rows, err := s.db.Query(`SELECT p.name, COUNT(*) AS c FROM draws d
+func (s *Store) Top(chat int64, since string) ([]Score, error) { return s.top("draws", chat, since) }
+
+func (s *Store) BeautyTop(chat int64, since string) ([]Score, error) {
+	return s.top("beauties", chat, since)
+}
+
+func (s *Store) top(table string, chat int64, since string) ([]Score, error) {
+	rows, err := s.db.Query(`SELECT p.name, COUNT(*) AS c FROM `+table+` d
 		JOIN players p ON p.chat_id = d.chat_id AND p.user_id = d.user_id
 		WHERE d.chat_id = ? AND d.day >= ?
 		GROUP BY d.user_id ORDER BY c DESC, p.name LIMIT 20`, chat, since)

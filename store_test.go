@@ -133,18 +133,48 @@ func TestTodayUsesTZ(t *testing.T) {
 	}
 }
 
+func TestBeauty(t *testing.T) {
+	s, err := OpenStore(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.Join(-7, 1, "A")
+	s.Join(-7, 2, "B")
+	s.Join(-7, 3, "C")
+	var first int64
+	for d := 1; d <= 30; d++ {
+		day := time.Date(2025, 1, d, 0, 0, 0, 0, time.UTC).Format("2006-01-02")
+		u, _, ok, err := s.Beauty(-7, day, 1)
+		if err != nil || !ok || u == 1 {
+			t.Fatalf("beauty: u=%d ok=%v err=%v", u, ok, err)
+		}
+		if d == 1 {
+			first = u
+		}
+	}
+	if u, _, _, _ := s.Beauty(-7, "2025-01-01", 1); u != first {
+		t.Fatal("same day must return the same beauty")
+	}
+	if top, _ := s.BeautyTop(-7, ""); len(top) == 0 {
+		t.Fatal("empty beauty top")
+	}
+	s.Join(-8, 1, "A")
+	if _, _, ok, _ := s.Beauty(-8, "2025-01-01", 1); ok {
+		t.Fatal("no beauty without a second player")
+	}
+}
+
 func TestPhrasesRender(t *testing.T) {
-	pools := [][]string{Openings, Spins, Sectors, Gifts, Letters, Reveals, Winners, Already, Joined,
-		{AlreadyJoined, LeftGame, NotJoined, LeftChat, NotEnough, PrivateOnly, EmptyTop, MyScore, Help},
-		BirthdayGreets,
-		{BirthdayRest, Anniversary, BirthdayBad, BirthdaySaved, BirthdayFromProfile, BirthdayKnown, BirthdayNotFound,
-			QuoteSaved, QuoteDup, QuoteNoText, QuoteTooLong, QuoteEmpty}}
+	pools := [][]string{Openings, Spins, Sectors, Gifts, Letters, Reveals, Winners, Already, Joined, Beauties, AlreadyBeauties,
+		AlreadyJoined, LeftGame, NotJoined, LeftChat, NotEnough, PrivateOnly, EmptyTop, MyScore, {Help},
+		BirthdayGreets, BirthdayRest, Anniversary, BirthdayBad, BirthdaySaved, BirthdayFromProfile, BirthdayKnown,
+		BirthdayNotFound, QuoteSaved, QuoteDup, QuoteNoText, QuoteTooLong, QuoteEmpty}
 	for _, j := range Jubilees {
 		pools = append(pools, []string{j})
 	}
 	for _, pool := range pools {
 		for _, p := range pool {
-			out := render(p, "{name}", "X", "{n}", "3", "{year}", "1", "{all}", "2", "{date}", "01.01", "{years}", "1", "{word}", "год")
+			out := render(p, "{name}", "X", "{n}", "3", "{year}", "1", "{all}", "2", "{byear}", "1", "{ball}", "2", "{date}", "01.01", "{years}", "1", "{word}", "год")
 			if strings.ContainsAny(out, "{}<&") {
 				t.Errorf("unrendered placeholder or raw HTML char: %q", out)
 			}

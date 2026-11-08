@@ -94,12 +94,12 @@ func (a *app) birthday(c tele.Context) error {
 	if arg := strings.TrimSpace(c.Message().Payload); arg != "" {
 		m, d, ok := parseDM(arg)
 		if !ok {
-			return c.Send(BirthdayBad)
+			return c.Send(pick(BirthdayBad))
 		}
 		if err := a.store.SetBirthday(u.ID, m, d, true); err != nil {
 			return err
 		}
-		return c.Send(render(BirthdaySaved, "{name}", esc(u), "{date}", fmtDM(m, d)))
+		return c.Send(render(pick(BirthdaySaved), "{name}", esc(u), "{date}", fmtDM(m, d)))
 	}
 	if m, d, ok := a.profileBirthday(u.ID); ok {
 		if err := a.store.SetBirthday(u.ID, m, d, false); err != nil {
@@ -111,9 +111,9 @@ func (a *app) birthday(c tele.Context) error {
 		return err
 	}
 	if !ok {
-		return c.Send(render(BirthdayNotFound, "{name}", esc(u)))
+		return c.Send(render(pick(BirthdayNotFound), "{name}", esc(u)))
 	}
-	return c.Send(render(BirthdayKnown, "{name}", esc(u), "{date}", fmtDM(m, d)))
+	return c.Send(render(pick(BirthdayKnown), "{name}", esc(u), "{date}", fmtDM(m, d)))
 }
 
 func (a *app) quote(c tele.Context) error {
@@ -124,26 +124,26 @@ func (a *app) quote(c tele.Context) error {
 			text = strings.TrimSpace(r.Caption)
 		}
 		if text == "" || r.Sender == nil || r.Sender.IsBot {
-			return c.Send(QuoteNoText)
+			return c.Send(pick(QuoteNoText))
 		}
 		if len([]rune(text)) > quoteMaxLen {
-			return c.Send(QuoteTooLong)
+			return c.Send(pick(QuoteTooLong))
 		}
 		fresh, err := a.store.AddQuote(chat, r.ID, displayName(r.Sender), text, today(time.Now(), a.loc))
 		if err != nil {
 			return err
 		}
 		if !fresh {
-			return c.Send(QuoteDup)
+			return c.Send(pick(QuoteDup))
 		}
-		return c.Send(QuoteSaved)
+		return c.Send(pick(QuoteSaved))
 	}
 	q, ok, err := a.store.RandomQuote(chat)
 	if err != nil {
 		return err
 	}
 	if !ok {
-		return c.Send(QuoteEmpty)
+		return c.Send(pick(QuoteEmpty))
 	}
 	year := q.SavedAt
 	if len(year) >= 4 {
@@ -195,7 +195,7 @@ func (a *app) greet(now time.Time) {
 		if ok, err := a.store.Greet(chat, 0, "anniversary", now.Year()); err != nil || !ok {
 			continue
 		}
-		a.say(chat, render(Anniversary, "{years}", strconv.Itoa(years), "{word}", yearsWord(years)))
+		a.say(chat, render(pick(Anniversary), "{years}", strconv.Itoa(years), "{word}", yearsWord(years)))
 	}
 }
 
