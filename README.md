@@ -1,75 +1,145 @@
-<p align="center"><img src="assets/icon.png" width="160" alt="Барабан"></p>
+<p align="center"><img src="assets/icon.png" width="160" alt="Prize wheel"></p>
 
-# Поле Чудес. Игрок дня
+<h1 align="center">Pole Chudes Bot</h1>
 
-Шуточный Telegram-бот для дружеских чатов. Раз в день он крутит барабан и выбирает одного из участников «П\*\*\*р дня». Розыгрыш ведёт пародия на Леонида Якубовича из «Поля Чудес»: «Вращайте барабан!», сектор «Приз», солёные огурцы из Саратова и табло, на котором открываются буквы.
+<p align="center">
+  A joke Telegram bot for friends' group chats: once a day it spins a prize wheel and picks one member for a mock title.<br>
+  The host is a parody of a Russian TV game-show presenter.
+</p>
 
-Идея пришла из популярных чатных игр в Telegram, где бот каждый день выбирает «пидора дня». Здесь от них осталась только эта игра, а ведущий говорит как в капитал-шоу.
+<p align="center">
+  <a href="https://github.com/belaytzev/pole-chudes-bot/actions/workflows/ci.yml"><img src="https://github.com/belaytzev/pole-chudes-bot/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/belaytzev/pole-chudes-bot/actions/workflows/codeql.yml"><img src="https://github.com/belaytzev/pole-chudes-bot/actions/workflows/codeql.yml/badge.svg" alt="CodeQL"></a>
+  <a href="https://github.com/belaytzev/pole-chudes-bot/releases"><img src="https://img.shields.io/github/v/release/belaytzev/pole-chudes-bot" alt="Release"></a>
+  <a href="go.mod"><img src="https://img.shields.io/github/go-mod/go-version/belaytzev/pole-chudes-bot" alt="Go version"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/belaytzev/pole-chudes-bot" alt="License: MIT"></a>
+</p>
 
-## Как это выглядит
+<p align="center">English · <a href="README.ru.md">Русский</a></p>
 
-Кто-то в чате пишет `/baraban`, и бот отвечает одним сообщением, которое меняется у всех на глазах:
+> The bot speaks Russian: its jokes, phrases and commands are written for a Russian-speaking chat. This README is in English so that anyone can run it, translate it or add phrases.
 
-> Добрый вечер! В эфире капитал-шоу «Поле Чудес»! Игроков у барабана: 5.
->
-> Вращайте барабан! 🎡
->
-> Сектор «Позор» на барабане! Первый раз такое вижу.
->
-> Тут мне передают солёные огурцы из Саратова… Спасибо, мама! 🥒
->
-> 🟦🟦🟦🟦🟦 дня
->
-> П🟦🟦🟦Р дня. Есть такая буква! 🎁 Приз в студию! Сегодня П\*\*\*р дня — Вася!
+## What it does
 
-Победитель выбирается случайно и один на весь день. Если позвать барабан ещё раз, ведущий напомнит, кто уже победил, и пригласит приходить завтра. Бот ведёт счёт побед, так что в конце года видно, кто чаще всех получал звание.
+Someone in the chat sends `/baraban`, and the bot answers with one message that changes in front of everyone:
 
-## Как играть
+> Good evening! This is the capital show "Pole Chudes"! Players at the drum: 5.
+> Spin the drum! 🎡
+> Sector "Shame" on the drum! First time I've seen that.
+> Someone is passing me pickles from Saratov… Thanks, Mom! 🥒
+> 🟦🟦🟦🟦🟦 of the day
+> П🟦🟦🟦Р of the day. There is such a letter! 🎁 Bring in the prize! Today's title goes to Vasya!
 
-1. Добавьте бота в групповой чат.
-2. Каждый, кто хочет играть, пишет `/igrok`. Без этого бот вас не знает: Telegram не показывает ботам список участников чата.
-3. Когда игроков хотя бы двое, любой может написать `/baraban`.
+The winner is random and the same for the whole day. A second `/baraban` reminds the chat who has already won. The bot keeps score, so at the end of the year everyone can see who got the title most often.
 
-| Команда | Что делает |
+The title itself is masked (`П***р дня`) on purpose, to keep the bot clear of Telegram's content filters. It is one constant, `Title`, in `phrases.go`.
+
+### Features
+
+- **Daily draw.** One winner per chat per day. The day changes at midnight in the configured time zone.
+- **Opt-in players.** Telegram does not tell bots who is in a chat, so everyone joins with `/igrok`. A member who leaves the chat is removed automatically.
+- **Leaderboards.** A yearly one and an all-time one, plus a personal score.
+- **Milestones.** Special lines for the 1st, 10th, 50th and 100th win.
+- **Birthdays.** The bot reads the date from the Telegram profile or takes it by hand. The birthday person sits out that day's draw and gets a greeting at 10:00.
+- **Anniversary.** A greeting on the anniversary of the chat's first draw.
+- **Quote book.** Reply `/citata` to a message to save it, send `/citata` alone to get a random saved quote.
+- **Spin sticker.** An optional animated sticker plays before the draw and disappears afterwards.
+- **Small and safe.** One static Go binary, SQLite storage, a 14 MB distroless image that runs as non-root with a read-only root filesystem. It uses about 20 MB of memory.
+
+## Commands
+
+| Command | What it does |
 |---|---|
-| `/igrok` | записаться в игру |
-| `/vyhod` | выйти из игры, прошлые победы сохраняются |
-| `/baraban` | крутить барабан, один раз в день |
-| `/kapital` | рейтинг за этот год |
-| `/zalslavy` | рейтинг за всё время |
-| `/moi` | ваш личный счёт |
+| `/igrok` | join the game |
+| `/vyhod` | leave the game, past wins are kept |
+| `/baraban` | spin the drum, once a day per chat |
+| `/kapital` | leaderboard for this year |
+| `/zalslavy` | all-time leaderboard |
+| `/moi` | your own score |
+| `/dr [dd.mm]` | set your birthday, e.g. `/dr 15.03`; without an argument the bot tries your Telegram profile |
+| `/citata` | reply to a message to save it as a quote; alone, shows a random quote |
+| `/start`, `/help` | the command list |
 
-Когда участник выходит из чата, бот обычно сам убирает его из игры. В очень больших группах Telegram об этом не сообщает, там надёжнее `/vyhod`.
+All game commands work only in group chats. At least two players are needed for a draw.
 
-## Как запустить своего бота
+## Quick start
 
-Понадобится компьютер или сервер с Docker, который работает круглосуточно.
+You need a machine with Docker that runs around the clock.
 
-1. Напишите [@BotFather](https://t.me/BotFather) в Telegram, создайте бота командой `/newbot` и скопируйте токен.
-2. Запустите:
+1. Create a bot with [@BotFather](https://t.me/BotFather): send `/newbot` and copy the token. Leave privacy mode on, the bot only reads commands.
+2. Run it:
 
    ```sh
    docker run -d --name pole-chudes-bot --restart unless-stopped \
-     -e BOT_TOKEN=ваш_токен \
+     -e BOT_TOKEN=your_token \
      -v pole-chudes-data:/data \
      ghcr.io/belaytzev/pole-chudes-bot:latest
    ```
 
-3. Добавьте бота в чат.
+   Or with Docker Compose: copy [`.env.example`](.env.example) to `.env`, fill in `BOT_TOKEN`, then `docker compose up -d`.
+3. Add the bot to a group chat and ask everyone to send `/igrok`.
 
-Результаты игр хранятся в томе `pole-chudes-data` и переживают перезапуск. Новый день начинается в полночь по Москве. Другой часовой пояс задаётся параметром `-e TZ=Europe/Berlin`.
+Run **only one copy per token**. Two pollers on one token get `409 Conflict` and Telegram hands the updates to just one of them.
 
-Запускайте только одну копию бота на токен, иначе Telegram отдаст сообщения только одной из них.
+Images are published to `ghcr.io/belaytzev/pole-chudes-bot` as `latest` (the `main` branch), `X.Y.Z` (a release tag) and `sha-<commit>`. Pin a version in production.
 
-## Для разработчиков
+### Configuration
 
-Бот написан на Go, данные лежат в SQLite. Фразы ведущего собраны в `phrases.go`, по списку на каждый этап розыгрыша. Звание задаёт константа `Title`.
+| Variable | Default | Description |
+|---|---|---|
+| `BOT_TOKEN` | — (required) | bot token from @BotFather |
+| `TZ` | `Europe/Moscow` | time zone: day boundary and the 10:00 greeting time |
+| `DB_PATH` | `bot.db` (`/data/bot.db` in the image) | SQLite file |
+| `SPIN_STICKER` | — | `file_id` of a sticker sent before each draw and deleted after it |
+
+### Data and backups
+
+All state is one SQLite file in WAL mode: players, wins, birthdays, quotes and sent greetings. There is no other copy, so back the file up (stop the bot or use `sqlite3 bot.db ".backup copy.db"`). Upgrades only add tables, existing data is never rewritten.
+
+Size is not a concern: a draw takes about 58 bytes, so 100 chats playing daily for 10 years come to roughly 21 MB.
+
+### Kubernetes
+
+Run a single replica with the `Recreate` strategy and a persistent volume mounted at `/data`. A volume of 100 Mi is plenty. The image runs as uid `65532` and expects a writable `/data` and an otherwise read-only filesystem.
+
+## Birthdays from the profile
+
+Telegram gives a bot a user's birthday only if that user has opened the date to everyone in the privacy settings. When the date is hidden or missing, `/dr 15.03` sets it by hand. A date typed by hand is never overwritten by the profile one. The bot greets people on 28 February when their birthday is 29 February in a non-leap year.
+
+## Visual identity
+
+[`assets/`](assets) holds a profile picture (`icon.png`, 640×640), five stickers (wheel, pickle, gift, letter board, trophy), and a spinning wheel as a transparent WebM video sticker and a GIF. They are drawn by [`assets/draw.py`](assets/draw.py):
 
 ```sh
-BOT_TOKEN=... go run .
-go test ./...
+uv run --with pillow python assets/draw.py /tmp/brand
 ```
 
-Необязательная переменная `SPIN_STICKER` — `file_id` стикера, который бот присылает перед розыгрышем. Готовые картинки и анимация барабана лежат в `assets/`, `draw.py` перерисовывает их.
+Set the picture with BotFather's `/setuserpic`. To use the spinning sticker, upload `drum_spin.webm` to a video sticker set with [@Stickers](https://t.me/Stickers), fetch the sticker's `file_id` from the Bot API (`getStickerSet`) and pass it as `SPIN_STICKER`.
 
-Каждый коммит в `main` публикует образ с тегом `latest`, а тег `vX.Y.Z` даёт образ `X.Y.Z`.
+## Development
+
+Go 1.27+ and [golangci-lint](https://golangci-lint.run/) v2 are required.
+
+```sh
+BOT_TOKEN=... DB_PATH=/tmp/pole-test.db go run .   # run with a test bot
+make check                                         # vet, tests with -race, lint, gofmt
+```
+
+| File | Role |
+|---|---|
+| `main.go` | bot setup, commands, the draw animation |
+| `store.go`, `store_fun.go` | SQLite storage: players, draws, birthdays, quotes, greetings |
+| `fun.go` | birthdays, greetings, quote book |
+| `phrases.go`, `fun_phrases.go` | the host's lines, one list per stage of the draw |
+
+CI runs `gofmt`, `go vet`, tests with the race detector, golangci-lint, `govulncheck` and CodeQL, then builds the Docker image. A pushed `v*` tag publishes the image and creates a GitHub release.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). AI coding agents should read [AGENTS.md](AGENTS.md).
+
+## Security
+
+Found a vulnerability? Please report it privately, see [SECURITY.md](SECURITY.md).
+
+## License
+
+[MIT](LICENSE). This is an unofficial fan parody and is not affiliated with, or endorsed by, any TV show, broadcaster or person it imitates.

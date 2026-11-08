@@ -1,0 +1,54 @@
+name: Bug Report
+description: Report something that doesn't work as expected
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug!
+        **Never include your bot token, `.env` contents or database files.**
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Expected vs. actual behavior.
+      placeholder: "/baraban answers that the draw was already played, but nobody played today..."
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Add the bot to a group
+        2. Send /igrok from two accounts
+        3. Send /baraban
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Image tag or commit
+      placeholder: e.g. 0.1.5 or commit 8e89b92
+    validations:
+      required: true
+  - type: dropdown
+    id: deployment
+    attributes:
+      label: How do you run the bot?
+      options:
+        - Docker
+        - Docker Compose
+        - Kubernetes
+        - go run
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Relevant lines from the bot's output. Remove tokens and personal data first.
+      render: text
