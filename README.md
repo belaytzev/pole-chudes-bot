@@ -108,13 +108,20 @@ Telegram gives a bot a user's birthday only if that user has opened the date to 
 
 ## Visual identity
 
-[`assets/`](assets) holds a profile picture (`icon.png`, 640×640), five stickers (wheel, pickle, gift, letter board, trophy), and a spinning wheel as a transparent WebM video sticker and a GIF. They are drawn by [`assets/draw.py`](assets/draw.py):
+[`assets/`](assets) holds:
+
+- `icon.png` — the bot's profile picture, 640×640: the game-show host with the prize drum;
+- `stickers/` — five static stickers of the host (`welcome`, `spin`, `pickle`, `gift`, `winner`), 512 px on the long side with transparent rounded corners;
+- `drum_spin.webm` — a transparent video sticker of the spinning drum (512×327, 1.6 s), rendered by [`draw_drum.py`](assets/draw_drum.py).
+
+The host pictures are **AI-generated** parody illustrations of a TV game-show host in the manner of a 1990s Russian show. They are unofficial fan art, see the disclaimer under [License](#license). The drum animation is drawn in code:
 
 ```sh
-uv run --with pillow python assets/draw.py /tmp/brand
+uv run --with pillow python assets/draw_drum.py /tmp/frames
+ffmpeg -framerate 30 -i /tmp/frames/%03d.png -c:v libvpx-vp9 -pix_fmt yuva420p -b:v 0 -crf 36 -auto-alt-ref 0 drum_spin.webm
 ```
 
-Set the picture with BotFather's `/setuserpic`. To use the spinning sticker, upload `drum_spin.webm` to a video sticker set with [@Stickers](https://t.me/Stickers), fetch the sticker's `file_id` from the Bot API (`getStickerSet`) and pass it as `SPIN_STICKER`.
+Set the picture with BotFather's `/setuserpic`. To use the spinning sticker, upload `drum_spin.webm` to a video sticker set with [@Stickers](https://t.me/Stickers), fetch the sticker's `file_id` from the Bot API (`getStickerSet`) and pass it as `SPIN_STICKER`. Telegram's limits for a video sticker are 512 px on one side, up to 3 seconds and 256 KB.
 
 ## Development
 

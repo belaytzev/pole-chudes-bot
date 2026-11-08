@@ -16,7 +16,7 @@ A Telegram bot in Go ([telebot v3](https://github.com/tucnak/telebot)) with SQLi
 | `fun.go` | `/dr`, `/citata`, the greeting loop |
 | `phrases.go`, `fun_phrases.go` | all text the bot says; one pool (a `[]string`) per stage |
 | `store_test.go`, `fun_test.go` | tests against an in-memory SQLite |
-| `assets/` | picture, stickers, animation and `draw.py` that renders them |
+| `assets/` | profile picture, host stickers (AI-generated art), `drum_spin.webm` and `draw_drum.py` that renders it |
 
 ## Commands
 
