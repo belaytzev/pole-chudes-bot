@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question / Help
+    url: https://github.com/belaytzev/pole-chudes-bot/discussions
+    about: For usage questions, start a discussion and check the README first.
+  - name: Security vulnerability
+    url: https://github.com/belaytzev/pole-chudes-bot/security/advisories/new
+    about: Please report security issues privately, not in public issues.

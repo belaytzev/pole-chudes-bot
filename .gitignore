@@ -1,4 +1,6 @@
 *.db
 *.db-*
+.env
 /pole-chudes-bot
 /deploy/
+.claude/worktree/
