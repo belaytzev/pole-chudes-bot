@@ -1,6 +1,6 @@
 module pole-chudes-bot
 
-go 1.27.1
+go 1.27.3
 
 require (
 	gopkg.in/telebot.v3 v3.3.8
