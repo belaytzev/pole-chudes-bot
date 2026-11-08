@@ -104,7 +104,7 @@ func (a *app) migrate(c tele.Context) error {
 func groupOnly(next tele.HandlerFunc) tele.HandlerFunc {
 	return func(c tele.Context) error {
 		if c.Chat().Type == tele.ChatPrivate {
-			return c.Send(PrivateOnly)
+			return c.Send(pick(PrivateOnly))
 		}
 		if u := c.Sender(); u != nil && u.IsBot { // anonymous group admins arrive as GroupAnonymousBot
 			return nil
@@ -125,7 +125,7 @@ func (a *app) join(c tele.Context) error {
 	if fresh {
 		return c.Send(render(pick(Joined), "{name}", esc(u)))
 	}
-	return c.Send(render(AlreadyJoined, "{name}", esc(u)))
+	return c.Send(render(pick(AlreadyJoined), "{name}", esc(u)))
 }
 
 func (a *app) leave(c tele.Context) error {
@@ -135,9 +135,9 @@ func (a *app) leave(c tele.Context) error {
 		return err
 	}
 	if left {
-		return c.Send(render(LeftGame, "{name}", esc(u)))
+		return c.Send(render(pick(LeftGame), "{name}", esc(u)))
 	}
-	return c.Send(render(NotJoined, "{name}", esc(u)))
+	return c.Send(render(pick(NotJoined), "{name}", esc(u)))
 }
 
 func (a *app) userLeft(c tele.Context) error {
@@ -146,7 +146,7 @@ func (a *app) userLeft(c tele.Context) error {
 	if err != nil || !left {
 		return err
 	}
-	return c.Send(render(LeftChat, "{name}", esc(u)))
+	return c.Send(render(pick(LeftChat), "{name}", esc(u)))
 }
 
 func (a *app) spin(c tele.Context) error {
@@ -157,16 +157,26 @@ func (a *app) spin(c tele.Context) error {
 	}
 	now := time.Now().In(a.loc)
 	excl := a.birthdayExcl(chat.ID, now)
-	user, name, fresh, ok, err := a.store.DrawExcept(chat.ID, today(now, a.loc), excl)
+	day := today(now, a.loc)
+	user, name, fresh, ok, err := a.store.DrawExcept(chat.ID, day, excl)
 	if err != nil {
 		return err
 	}
 	if !ok {
-		return c.Send(NotEnough)
+		return c.Send(pick(NotEnough))
 	}
+	bUser, bName, bOk, err := a.store.Beauty(chat.ID, day, user)
+	if err != nil {
+		return err
+	}
+	bName = html.EscapeString(bName)
 	name = html.EscapeString(name)
 	if !fresh {
-		return c.Send(render(pick(Already), "{name}", name))
+		msg := render(pick(Already), "{name}", name)
+		if bOk {
+			msg += "\n" + render(pick(AlreadyBeauties), "{name}", bName)
+		}
+		return c.Send(msg)
 	}
 	wins, err := a.store.Wins(chat.ID, user, "")
 	if err != nil {
@@ -178,8 +188,12 @@ func (a *app) spin(c tele.Context) error {
 	if j, ok := Jubilees[wins]; ok {
 		final += "\n\n" + render(j, "{name}", name)
 	}
+	if bOk {
+		bMention := `<a href="tg://user?id=` + strconv.FormatInt(bUser, 10) + `">` + bName + `</a>`
+		final += "\n\n" + render(pick(Beauties), "{name}", bMention)
+	}
 	if len(excl) > 0 && !slices.Contains(excl, user) {
-		final += "\n\n" + BirthdayRest
+		final += "\n\n" + pick(BirthdayRest)
 	}
 	frames := []string{
 		render(pick(Openings), "{n}", strconv.Itoa(players)),
@@ -231,12 +245,30 @@ func (a *app) top(c tele.Context, header, since string) error {
 	if err != nil {
 		return err
 	}
-	if len(top) == 0 {
-		return c.Send(EmptyTop)
+	beauty, err := a.store.BeautyTop(c.Chat().ID, since)
+	if err != nil {
+		return err
 	}
-	medals := []string{"🥇", "🥈", "🥉"}
+	if len(top) == 0 && len(beauty) == 0 {
+		return c.Send(pick(EmptyTop))
+	}
 	var b strings.Builder
-	b.WriteString(header + "\n" + Title + "\n")
+	b.WriteString(header)
+	for _, sec := range []struct {
+		title string
+		top   []Score
+	}{{Title, top}, {BeautyTitle, beauty}} {
+		if len(sec.top) == 0 {
+			continue
+		}
+		b.WriteString("\n\n" + sec.title + "\n")
+		writeTop(&b, sec.top)
+	}
+	return c.Send(b.String())
+}
+
+func writeTop(b *strings.Builder, top []Score) {
+	medals := []string{"🥇", "🥈", "🥉"}
 	for i, s := range top {
 		place := strconv.Itoa(i+1) + "."
 		if i < len(medals) {
@@ -244,7 +276,6 @@ func (a *app) top(c tele.Context, header, since string) error {
 		}
 		b.WriteString("\n" + place + " " + html.EscapeString(s.Name) + " — " + strconv.Itoa(s.Count))
 	}
-	return c.Send(b.String())
 }
 
 func (a *app) mine(c tele.Context) error {
@@ -257,7 +288,17 @@ func (a *app) mine(c tele.Context) error {
 	if err != nil {
 		return err
 	}
-	return c.Send(render(MyScore, "{name}", esc(u), "{year}", strconv.Itoa(year), "{all}", strconv.Itoa(all)))
+	since := time.Now().In(a.loc).Format("2006") + "-01-01"
+	byear, err := a.store.BeautyWins(c.Chat().ID, u.ID, since)
+	if err != nil {
+		return err
+	}
+	ball, err := a.store.BeautyWins(c.Chat().ID, u.ID, "")
+	if err != nil {
+		return err
+	}
+	return c.Send(render(pick(MyScore), "{name}", esc(u), "{year}", strconv.Itoa(year), "{all}", strconv.Itoa(all),
+		"{byear}", strconv.Itoa(byear), "{ball}", strconv.Itoa(ball)))
 }
 
 func today(t time.Time, loc *time.Location) string { return t.In(loc).Format("2006-01-02") }
