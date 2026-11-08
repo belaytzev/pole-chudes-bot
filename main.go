@@ -178,8 +178,15 @@ func (a *app) spin(c tele.Context) error {
 	}
 
 	if a.sticker != "" {
-		if _, err := a.bot.Send(chat, &tele.Sticker{File: tele.File{FileID: a.sticker}}); err != nil {
+		sm, err := a.bot.Send(chat, &tele.Sticker{File: tele.File{FileID: a.sticker}})
+		if err != nil {
 			log.Printf("send sticker: %v", err)
+		} else {
+			defer func() {
+				if err := a.bot.Delete(sm); err != nil {
+					log.Printf("delete sticker: %v", err)
+				}
+			}()
 		}
 	}
 	msg, err := a.bot.Send(chat, frames[0])
