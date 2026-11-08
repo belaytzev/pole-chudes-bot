@@ -1,0 +1,10 @@
+services:
+  bot:
+    image: ghcr.io/belaytzev/pole-chudes-bot:latest
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - data:/data
+
+volumes:
+  data:
