@@ -135,13 +135,16 @@ func TestTodayUsesTZ(t *testing.T) {
 
 func TestPhrasesRender(t *testing.T) {
 	pools := [][]string{Openings, Spins, Sectors, Gifts, Letters, Reveals, Winners, Already, Joined,
-		{AlreadyJoined, LeftGame, NotJoined, LeftChat, NotEnough, PrivateOnly, EmptyTop, MyScore, Help}}
+		{AlreadyJoined, LeftGame, NotJoined, LeftChat, NotEnough, PrivateOnly, EmptyTop, MyScore, Help},
+		BirthdayGreets,
+		{BirthdayRest, Anniversary, BirthdayBad, BirthdaySaved, BirthdayFromProfile, BirthdayKnown, BirthdayNotFound,
+			QuoteSaved, QuoteDup, QuoteNoText, QuoteTooLong, QuoteEmpty}}
 	for _, j := range Jubilees {
 		pools = append(pools, []string{j})
 	}
 	for _, pool := range pools {
 		for _, p := range pool {
-			out := render(p, "{name}", "X", "{n}", "3", "{year}", "1", "{all}", "2")
+			out := render(p, "{name}", "X", "{n}", "3", "{year}", "1", "{all}", "2", "{date}", "01.01", "{years}", "1", "{word}", "год")
 			if strings.ContainsAny(out, "{}<&") {
 				t.Errorf("unrendered placeholder or raw HTML char: %q", out)
 			}

@@ -6,6 +6,7 @@ import (
 	"math/rand/v2"
 	"os"
 	"os/signal"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -65,6 +66,8 @@ func main() {
 	g.Handle("/kapital", a.yearTop)
 	g.Handle("/zalslavy", a.allTop)
 	g.Handle("/moi", a.mine)
+	g.Handle("/dr", a.birthday)
+	g.Handle("/citata", a.quote)
 	g.Handle(tele.OnUserLeft, a.userLeft)
 	g.Handle(tele.OnMigration, a.migrate)
 
@@ -75,6 +78,8 @@ func main() {
 		{Text: "kapital", Description: "Итоги года"},
 		{Text: "zalslavy", Description: "Зал славы"},
 		{Text: "moi", Description: "Мой счёт"},
+		{Text: "dr", Description: "День рождения"},
+		{Text: "citata", Description: "Цитата: сохранить или показать"},
 	})
 	if err != nil {
 		log.Printf("set commands: %v", err)
@@ -83,6 +88,7 @@ func main() {
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 	go func() { <-stop; bot.Stop() }()
+	go a.greetLoop()
 	bot.Start()
 	inflight.Wait()
 	if err := store.Close(); err != nil {
@@ -115,6 +121,7 @@ func (a *app) join(c tele.Context) error {
 	if err != nil {
 		return err
 	}
+	go a.syncBirthday(u.ID)
 	if fresh {
 		return c.Send(render(pick(Joined), "{name}", esc(u)))
 	}
@@ -148,7 +155,9 @@ func (a *app) spin(c tele.Context) error {
 	if err != nil {
 		return err
 	}
-	user, name, fresh, ok, err := a.store.Draw(chat.ID, today(time.Now(), a.loc))
+	now := time.Now().In(a.loc)
+	excl := a.birthdayExcl(chat.ID, now)
+	user, name, fresh, ok, err := a.store.DrawExcept(chat.ID, today(now, a.loc), excl)
 	if err != nil {
 		return err
 	}
@@ -168,6 +177,9 @@ func (a *app) spin(c tele.Context) error {
 	final := "П🟦🟦🟦Р дня\n\n" + pick(Reveals) + "\n\n" + render(pick(Winners), "{name}", mention)
 	if j, ok := Jubilees[wins]; ok {
 		final += "\n\n" + render(j, "{name}", name)
+	}
+	if len(excl) > 0 && !slices.Contains(excl, user) {
+		final += "\n\n" + BirthdayRest
 	}
 	frames := []string{
 		render(pick(Openings), "{n}", strconv.Itoa(players)),
