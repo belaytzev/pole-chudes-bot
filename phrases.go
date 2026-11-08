@@ -110,7 +110,9 @@ const (
 /baraban — вращать барабан
 /kapital — итоги года
 /zalslavy — зал славы за всё время
-/moi — мой счёт`
+/moi — мой счёт
+/dr — день рождения: из профиля или вручную, /dr 15.03
+/citata — ответом на сообщение сохраняет цитату, без ответа показывает случайную`
 )
 
 func pick(pool []string) string { return pool[rand.IntN(len(pool))] }

@@ -65,6 +65,8 @@ func main() {
 	g.Handle("/kapital", a.yearTop)
 	g.Handle("/zalslavy", a.allTop)
 	g.Handle("/moi", a.mine)
+	g.Handle("/dr", a.birthday)
+	g.Handle("/citata", a.quote)
 	g.Handle(tele.OnUserLeft, a.userLeft)
 	g.Handle(tele.OnMigration, a.migrate)
 
@@ -75,6 +77,8 @@ func main() {
 		{Text: "kapital", Description: "Итоги года"},
 		{Text: "zalslavy", Description: "Зал славы"},
 		{Text: "moi", Description: "Мой счёт"},
+		{Text: "dr", Description: "День рождения"},
+		{Text: "citata", Description: "Цитата: сохранить или показать"},
 	})
 	if err != nil {
 		log.Printf("set commands: %v", err)
@@ -83,6 +87,7 @@ func main() {
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 	go func() { <-stop; bot.Stop() }()
+	go a.greetLoop()
 	bot.Start()
 	inflight.Wait()
 	if err := store.Close(); err != nil {
@@ -115,6 +120,7 @@ func (a *app) join(c tele.Context) error {
 	if err != nil {
 		return err
 	}
+	go a.syncBirthday(u.ID)
 	if fresh {
 		return c.Send(render(pick(Joined), "{name}", esc(u)))
 	}
