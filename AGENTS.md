@@ -13,7 +13,8 @@ A Telegram bot in Go ([telebot v3](https://github.com/tucnak/telebot)) with SQLi
 | `main.go` | bot setup, command handlers, the draw animation, graceful shutdown |
 | `store.go` | storage core: `players`, `draws`, `Draw`/`DrawExcept` |
 | `store_fun.go` | birthdays, quotes, greetings tables and queries |
-| `fun.go` | `/dr`, `/citata`, the greeting loop |
+| `fun.go` | `/dr`, `/citata`, the greeting loop, year-end results |
+| `awards.go` | achievements, computed from draws on the fly (no table) |
 | `phrases.go`, `fun_phrases.go` | all text the bot says; one pool (a `[]string`) per stage |
 | `store_test.go`, `fun_test.go` | tests against an in-memory SQLite |
 | `assets/` | picture, stickers, animation and `draw.py` that renders them |

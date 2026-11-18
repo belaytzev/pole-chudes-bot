@@ -1,6 +1,7 @@
 package main
 
 import (
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -164,17 +165,101 @@ func TestBeauty(t *testing.T) {
 	}
 }
 
+func TestStreak(t *testing.T) {
+	s, _ := OpenStore(":memory:")
+	const chat = -100
+	for day, user := range map[string]int64{"2026-02-27": 1, "2026-02-28": 1, "2026-03-01": 1, "2026-03-02": 2, "2026-03-04": 2} {
+		if _, err := s.db.Exec(`INSERT INTO draws (chat_id, day, user_id) VALUES (?, ?, ?)`, chat, day, user); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for user, want := range map[int64][]int{1: {3}, 2: {1, 1}, 3: nil} {
+		days, err := s.WinDays(chat, user)
+		if got := runs(days); err != nil || !slices.Equal(got, want) {
+			t.Errorf("runs(user %d) = %v, %v; want %v", user, got, err, want)
+		}
+	}
+}
+
+func TestAwards(t *testing.T) {
+	if got := newAwards(stats{}, stats{Wins: 1, BestStreak: 1}); !slices.Equal(got, []string{"🎬 Дебютант"}) {
+		t.Errorf("first win: %v", got)
+	}
+	if got := newAwards(stats{Wins: 1, BestStreak: 1}, stats{Wins: 2, BestStreak: 2}); !slices.Equal(got, []string{"🎯 Дубль"}) {
+		t.Errorf("second day in a row: %v", got)
+	}
+	if got := newAwards(stats{Wins: 3, BestStreak: 2}, stats{Wins: 4, BestStreak: 2}); len(got) != 0 {
+		t.Errorf("a repeated streak must not award again: %v", got)
+	}
+	if got := earned(stats{Wins: 10, BestStreak: 3, Beauty: 1}); len(got) != 6 {
+		t.Errorf("earned: %v", got)
+	}
+}
+
+func TestDeal(t *testing.T) {
+	s, _ := OpenStore(":memory:")
+	pool := []string{"a", "b", "c", "d"}
+	for round := 0; round < 3; round++ {
+		seen := map[string]bool{}
+		for range pool {
+			p, err := s.Deal(-1, "test", pool)
+			if err != nil {
+				t.Fatal(err)
+			}
+			seen[p] = true
+		}
+		if len(seen) != len(pool) {
+			t.Fatalf("round %d: dealt %d of %d phrases", round, len(seen), len(pool))
+		}
+	}
+}
+
+func TestYearEndText(t *testing.T) {
+	lead := yearEndText(2026, []Score{{"Вася", 5}, {"Петя", 3}}, nil)
+	tie := yearEndText(2026, []Score{{"Вася", 5}, {"Петя", 5}}, []Score{{"Коля", 2}})
+	if !strings.Contains(strings.ToLower(lead), "побед: 5") {
+		t.Errorf("no champion line: %q", lead)
+	}
+	if strings.Contains(strings.ToLower(tie), "побед: 5") {
+		t.Errorf("a tie must not name a champion: %q", tie)
+	}
+	for _, out := range []string{lead, tie} {
+		if strings.ContainsAny(out, "{}") {
+			t.Errorf("unrendered placeholder: %q", out)
+		}
+	}
+}
+
+func TestPickDealsWholePool(t *testing.T) {
+	pool := []string{"a", "b", "c", "d", "e"}
+	prev := ""
+	for round := 0; round < 20; round++ {
+		seen := map[string]bool{}
+		for range pool {
+			p := pick(pool)
+			if p == prev {
+				t.Fatalf("round %d: %q dealt twice in a row", round, p)
+			}
+			seen[p], prev = true, p
+		}
+		if len(seen) != len(pool) {
+			t.Fatalf("round %d: dealt %d of %d phrases", round, len(seen), len(pool))
+		}
+	}
+}
+
 func TestPhrasesRender(t *testing.T) {
 	pools := [][]string{Openings, Spins, Sectors, Gifts, Letters, Reveals, Winners, Already, Joined, Beauties, AlreadyBeauties,
 		AlreadyJoined, LeftGame, NotJoined, LeftChat, NotEnough, PrivateOnly, EmptyTop, MyScore, {Help},
 		BirthdayGreets, BirthdayRest, Anniversary, BirthdayBad, BirthdaySaved, BirthdayFromProfile, BirthdayKnown,
 		BirthdayNotFound, QuoteSaved, QuoteDup, QuoteNoText, QuoteTooLong, QuoteEmpty}
+	pools = append(pools, Streaks, Prizes, YearEnd, YearChampion, YearTie, AwardNew, NoAwards)
 	for _, j := range Jubilees {
-		pools = append(pools, []string{j})
+		pools = append(pools, j)
 	}
 	for _, pool := range pools {
 		for _, p := range pool {
-			out := render(p, "{name}", "X", "{n}", "3", "{year}", "1", "{all}", "2", "{byear}", "1", "{ball}", "2", "{date}", "01.01", "{years}", "1", "{word}", "год")
+			out := render(p, "{name}", "X", "{n}", "3", "{year}", "1", "{all}", "2", "{byear}", "1", "{ball}", "2", "{date}", "01.01", "{years}", "1", "{word}", "год", "{count}", "5", "{award}", "Y")
 			if strings.ContainsAny(out, "{}<&") {
 				t.Errorf("unrendered placeholder or raw HTML char: %q", out)
 			}

@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"math/rand/v2"
 
 	_ "modernc.org/sqlite"
 )
@@ -161,6 +162,58 @@ func (s *Store) wins(table string, chat, user int64, since string) (n int, err e
 	err = s.db.QueryRow(`SELECT COUNT(*) FROM `+table+` WHERE chat_id = ? AND user_id = ? AND day >= ?`,
 		chat, user, since).Scan(&n)
 	return
+}
+
+func (s *Store) WinDays(chat, user int64) ([]string, error) {
+	rows, err := s.db.Query(`SELECT day FROM draws WHERE chat_id = ? AND user_id = ? ORDER BY day`, chat, user)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var days []string
+	for rows.Next() {
+		var d string
+		if err := rows.Scan(&d); err != nil {
+			return nil, err
+		}
+		days = append(days, d)
+	}
+	return days, rows.Err()
+}
+
+// Deal hands out a pool like a deck kept per chat: a phrase returns only after the rest were used, across restarts.
+func (s *Store) Deal(chat int64, name string, pool []string) (string, error) {
+	rows, err := s.db.Query(`SELECT phrase FROM used_phrases WHERE chat_id = ? AND pool = ?`, chat, name)
+	if err != nil {
+		return "", err
+	}
+	used := map[string]bool{}
+	for rows.Next() {
+		var p string
+		if err := rows.Scan(&p); err != nil {
+			rows.Close()
+			return "", err
+		}
+		used[p] = true
+	}
+	if err := rows.Close(); err != nil {
+		return "", err
+	}
+	var left []string
+	for _, p := range pool {
+		if !used[p] {
+			left = append(left, p)
+		}
+	}
+	if len(left) == 0 {
+		if _, err := s.db.Exec(`DELETE FROM used_phrases WHERE chat_id = ? AND pool = ?`, chat, name); err != nil {
+			return "", err
+		}
+		left = pool
+	}
+	p := left[rand.IntN(len(left))]
+	_, err = s.db.Exec(`INSERT OR IGNORE INTO used_phrases (chat_id, pool, phrase) VALUES (?, ?, ?)`, chat, name, p)
+	return p, err
 }
 
 func (s *Store) Top(chat int64, since string) ([]Score, error) { return s.top("draws", chat, since) }

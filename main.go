@@ -178,19 +178,36 @@ func (a *app) spin(c tele.Context) error {
 		}
 		return c.Send(msg)
 	}
-	wins, err := a.store.Wins(chat.ID, user, "")
+	days, err := a.store.WinDays(chat.ID, user)
 	if err != nil {
 		return err
 	}
+	series := runs(days)
+	if len(series) == 0 {
+		series = []int{1}
+	}
+	wins, streak := len(days), series[len(series)-1]
+	before := slices.Clone(series)
+	before[len(before)-1]--
+	a.react(chat, c.Message(), "👀")
 
 	mention := `<a href="tg://user?id=` + strconv.FormatInt(user, 10) + `">` + name + `</a>`
-	final := "П🟦🟦🟦Р дня\n\n" + pick(Reveals) + "\n\n" + render(pick(Winners), "{name}", mention)
+	final := "П🟦🟦🟦Р дня\n\n" + a.deal(chat.ID, "reveals", Reveals) + "\n\n" + render(a.deal(chat.ID, "winners", Winners), "{name}", mention)
 	if j, ok := Jubilees[wins]; ok {
-		final += "\n\n" + render(j, "{name}", name)
+		final += "\n\n" + render(pick(j), "{name}", name)
+	} else if streak >= 2 {
+		final += "\n\n" + render(pick(Streaks), "{name}", name, "{n}", strconv.Itoa(streak))
 	}
+	final += awardLines(name, stats{Wins: wins - 1, BestStreak: best(before)}, stats{Wins: wins, BestStreak: best(series)})
+	final += "\n\n" + a.deal(chat.ID, "prizes", Prizes)
 	if bOk {
 		bMention := `<a href="tg://user?id=` + strconv.FormatInt(bUser, 10) + `">` + bName + `</a>`
-		final += "\n\n" + render(pick(Beauties), "{name}", bMention)
+		final += "\n\n" + render(a.deal(chat.ID, "beauties", Beauties), "{name}", bMention)
+		bWins, err := a.store.BeautyWins(chat.ID, bUser, "")
+		if err != nil {
+			return err
+		}
+		final += awardLines(bName, stats{Beauty: bWins - 1}, stats{Beauty: bWins})
 	}
 	if len(excl) > 0 && !slices.Contains(excl, user) {
 		final += "\n\n" + pick(BirthdayRest)
@@ -230,7 +247,33 @@ func (a *app) spin(c tele.Context) error {
 		log.Printf("edit final: %v", err)
 		return c.Send(final)
 	}
+	a.react(chat, msg, pick(WinReactions))
 	return nil
+}
+
+func (a *app) deal(chat int64, name string, pool []string) string {
+	p, err := a.store.Deal(chat, name, pool)
+	if err != nil {
+		log.Printf("deal %s: %v", name, err)
+		return pick(pool)
+	}
+	return p
+}
+
+func awardLines(name string, before, after stats) string {
+	var out string
+	for _, aw := range newAwards(before, after) {
+		out += "\n\n" + render(pick(AwardNew), "{name}", name, "{award}", aw)
+	}
+	return out
+}
+
+// Chats may restrict the allowed reactions, so a failure is only logged.
+func (a *app) react(chat *tele.Chat, msg tele.Editable, emoji string) {
+	err := a.bot.React(chat, msg, tele.ReactionOptions{Reactions: []tele.Reaction{{Type: "emoji", Emoji: emoji}}, Big: true})
+	if err != nil {
+		log.Printf("react: %v", err)
+	}
 }
 
 func (a *app) yearTop(c tele.Context) error {
@@ -252,6 +295,10 @@ func (a *app) top(c tele.Context, header, since string) error {
 	if len(top) == 0 && len(beauty) == 0 {
 		return c.Send(pick(EmptyTop))
 	}
+	return c.Send(topText(header, top, beauty))
+}
+
+func topText(header string, top, beauty []Score) string {
 	var b strings.Builder
 	b.WriteString(header)
 	for _, sec := range []struct {
@@ -264,7 +311,18 @@ func (a *app) top(c tele.Context, header, since string) error {
 		b.WriteString("\n\n" + sec.title + "\n")
 		writeTop(&b, sec.top)
 	}
-	return c.Send(b.String())
+	return b.String()
+}
+
+func yearEndText(year int, top, beauty []Score) string {
+	text := topText(render(pick(YearEnd), "{year}", strconv.Itoa(year)), top, beauty)
+	if len(top) == 0 {
+		return text
+	}
+	if len(top) > 1 && top[0].Count == top[1].Count {
+		return text + "\n\n" + pick(YearTie)
+	}
+	return text + "\n\n" + render(pick(YearChampion), "{name}", html.EscapeString(top[0].Name), "{count}", strconv.Itoa(top[0].Count))
 }
 
 func writeTop(b *strings.Builder, top []Score) {
@@ -297,8 +355,16 @@ func (a *app) mine(c tele.Context) error {
 	if err != nil {
 		return err
 	}
+	days, err := a.store.WinDays(c.Chat().ID, u.ID)
+	if err != nil {
+		return err
+	}
+	awards := pick(NoAwards)
+	if got := earned(stats{Wins: all, BestStreak: best(runs(days)), Beauty: ball}); len(got) > 0 {
+		awards = "🏅 Ачивки: " + strings.Join(got, ", ")
+	}
 	return c.Send(render(pick(MyScore), "{name}", esc(u), "{year}", strconv.Itoa(year), "{all}", strconv.Itoa(all),
-		"{byear}", strconv.Itoa(byear), "{ball}", strconv.Itoa(ball)))
+		"{byear}", strconv.Itoa(byear), "{ball}", strconv.Itoa(ball)) + "\n\n" + awards)
 }
 
 func today(t time.Time, loc *time.Location) string { return t.In(loc).Format("2006-01-02") }
