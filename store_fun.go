@@ -27,6 +27,12 @@ CREATE TABLE IF NOT EXISTS greetings (
 	kind    TEXT    NOT NULL,
 	year    INTEGER NOT NULL,
 	PRIMARY KEY (chat_id, user_id, kind, year)
+);
+CREATE TABLE IF NOT EXISTS used_phrases (
+	chat_id INTEGER NOT NULL,
+	pool    TEXT    NOT NULL,
+	phrase  TEXT    NOT NULL,
+	PRIMARY KEY (chat_id, pool, phrase)
 );`
 
 type Birthday struct {

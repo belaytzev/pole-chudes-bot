@@ -14,6 +14,7 @@ import (
 
 const (
 	greetHour   = 10
+	yearEndHour = 21
 	quoteMaxLen = 500
 )
 
@@ -136,6 +137,7 @@ func (a *app) quote(c tele.Context) error {
 		if !fresh {
 			return c.Send(pick(QuoteDup))
 		}
+		a.react(c.Chat(), r, "✍")
 		return c.Send(pick(QuoteSaved))
 	}
 	q, ok, err := a.store.RandomQuote(chat)
@@ -182,6 +184,11 @@ func (a *app) greet(now time.Time) {
 		log.Printf("chats: %v", err)
 		return
 	}
+	if now.Month() == time.December && now.Day() == 31 && now.Hour() >= yearEndHour {
+		for _, chat := range chats {
+			a.yearEnd(chat, now.Year())
+		}
+	}
 	for _, chat := range chats {
 		first, err := a.store.FirstDraw(chat)
 		if err != nil || first == "" {
@@ -197,6 +204,27 @@ func (a *app) greet(now time.Time) {
 		}
 		a.say(chat, render(pick(Anniversary), "{years}", strconv.Itoa(years), "{word}", yearsWord(years)))
 	}
+}
+
+func (a *app) yearEnd(chat int64, year int) {
+	since := strconv.Itoa(year) + "-01-01"
+	top, err := a.store.Top(chat, since)
+	if err != nil {
+		log.Printf("year end top: %v", err)
+		return
+	}
+	beauty, err := a.store.BeautyTop(chat, since)
+	if err != nil {
+		log.Printf("year end beauty top: %v", err)
+		return
+	}
+	if len(top) == 0 && len(beauty) == 0 {
+		return
+	}
+	if ok, err := a.store.Greet(chat, 0, "yearend", year); err != nil || !ok {
+		return
+	}
+	a.say(chat, yearEndText(year, top, beauty))
 }
 
 func (a *app) say(chat int64, text string) {

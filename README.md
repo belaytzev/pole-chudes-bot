@@ -32,6 +32,10 @@ Someone in the chat sends `/baraban`, and the bot answers with one message that 
 
 The winner is random and the same for the whole day. A second `/baraban` reminds the chat who has already won. The bot keeps score, so at the end of the year everyone can see who got the title most often.
 
+The result also names a prize of the day, marks milestone wins and "N days in a row" streaks, and gets an emoji reaction from the bot. Wins, streaks and beauty titles earn achievements, listed by `/moi`. The lines of the result are dealt like a deck, one per chat: a line does not come back until the rest of its list has been used.
+
+On 31 December at 21:00 the bot posts the year's results and names the champion of the season.
+
 The title itself is masked (`П***р дня`) on purpose, to keep the bot clear of Telegram's content filters. It is one constant, `Title`, in `phrases.go`.
 
 ### Features
